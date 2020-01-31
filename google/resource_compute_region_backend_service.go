@@ -107,6 +107,13 @@ balancing cannot be used with the other(s). Must be 'INTERNAL' or
 'INTERNAL_MANAGED'. Defaults to 'INTERNAL'.`,
 				Default: "INTERNAL",
 			},
+			"port_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+				Description: `Name of backend port. The same name should appear in the instance
+groups referenced by this service.`,
+			},
 			"protocol": {
 				Type:         schema.TypeString,
 				Computed:     true,
@@ -332,6 +339,12 @@ func resourceComputeRegionBackendServiceCreate(d *schema.ResourceData, meta inte
 	} else if v, ok := d.GetOkExists("name"); !isEmptyValue(reflect.ValueOf(nameProp)) && (ok || !reflect.DeepEqual(v, nameProp)) {
 		obj["name"] = nameProp
 	}
+	portNameProp, err := expandComputeRegionBackendServiceName(d.Get("port_name"), d, config)
+	if err != nil {
+		return err
+	} else if v, ok := d.GetOkExists("port_name"); !isEmptyValue(reflect.ValueOf(portNameProp)) && (ok || !reflect.DeepEqual(v, portNameProp)) {
+		obj["portName"] = portNameProp
+	}
 	protocolProp, err := expandComputeRegionBackendServiceProtocol(d.Get("protocol"), d, config)
 	if err != nil {
 		return err
@@ -446,6 +459,9 @@ func resourceComputeRegionBackendServiceRead(d *schema.ResourceData, meta interf
 	if err := d.Set("name", flattenComputeRegionBackendServiceName(res["name"], d)); err != nil {
 		return fmt.Errorf("Error reading RegionBackendService: %s", err)
 	}
+	if err := d.Set("port_name", flattenComputeRegionBackendServicePortName(res["portName"], d)); err != nil {
+		return fmt.Errorf("Error reading BackendService: %s", err)
+	}
 	if err := d.Set("protocol", flattenComputeRegionBackendServiceProtocol(res["protocol"], d)); err != nil {
 		return fmt.Errorf("Error reading RegionBackendService: %s", err)
 	}
@@ -515,6 +531,12 @@ func resourceComputeRegionBackendServiceUpdate(d *schema.ResourceData, meta inte
 		return err
 	} else if v, ok := d.GetOkExists("name"); !isEmptyValue(reflect.ValueOf(v)) && (ok || !reflect.DeepEqual(v, nameProp)) {
 		obj["name"] = nameProp
+	}
+	portNameProp, err := expandComputeRegionBackendServiceName(d.Get("port_name"), d, config)
+	if err != nil {
+		return err
+	} else if v, ok := d.GetOkExists("port_name"); !isEmptyValue(reflect.ValueOf(v)) && (ok || !reflect.DeepEqual(v, portNameProp)) {
+		obj["portName"] = portNameProp
 	}
 	protocolProp, err := expandComputeRegionBackendServiceProtocol(d.Get("protocol"), d, config)
 	if err != nil {
@@ -764,6 +786,10 @@ func flattenComputeRegionBackendServiceLoadBalancingScheme(v interface{}, d *sch
 }
 
 func flattenComputeRegionBackendServiceName(v interface{}, d *schema.ResourceData) interface{} {
+	return v
+}
+
+func flattenComputeRegionBackendServicePortName(v interface{}, d *schema.ResourceData) interface{} {
 	return v
 }
 

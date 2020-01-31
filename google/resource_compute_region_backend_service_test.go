@@ -131,6 +131,31 @@ func TestAccComputeRegionBackendService_withConnectionDrainingAndUpdate(t *testi
 	})
 }
 
+func TestAccComputeRegionBackendService_withBackendAndPortName(t *testing.T) {
+	t.Parallel()
+
+	serviceName := fmt.Sprintf("tf-test-%s", acctest.RandString(10))
+	igName := fmt.Sprintf("tf-test-%s", acctest.RandString(10))
+	itName := fmt.Sprintf("tf-test-%s", acctest.RandString(10))
+	checkName := fmt.Sprintf("tf-test-%s", acctest.RandString(10))
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckComputeRegionBackendServiceDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccComputeRegionBackendService_withBackendAndPortName(
+					serviceName, igName, itName, checkName, 10),
+			},
+			{
+				ResourceName:      "google_compute_region_backend_service.lipsum",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 func testAccComputeRegionBackendService_basic(serviceName, checkName string) string {
 	return fmt.Sprintf(`
 resource "google_compute_region_backend_service" "foobar" {
@@ -260,4 +285,72 @@ resource "google_compute_health_check" "zero" {
   }
 }
 `, serviceName, drainingTimeout, checkName)
+}
+
+func testAccComputeRegionBackendService_withBackendAndPortName(
+	serviceName, igName, itName, checkName string, timeout int64) string {
+	return fmt.Sprintf(`
+data "google_compute_image" "my_image" {
+  family  = "debian-9"
+  project = "debian-cloud"
+}
+
+resource "google_compute_region_backend_service" "lipsum" {
+  name        = "%s"
+  description = "Hello World 1234"
+  port_name   = "custom"
+  protocol    = "HTTPS"
+  region      = "us-central1"
+  timeout_sec = %v
+
+  load_balancing_scheme = "INTERNAL_MANAGED"
+
+  backend {
+    group    = google_compute_instance_group_manager.foobar.instance_group
+  }
+
+  health_checks = [google_compute_health_check.default.self_link]
+}
+
+resource "google_compute_instance_group_manager" "foobar" {
+  name = "%s"
+  version {
+    instance_template = google_compute_instance_template.foobar.self_link
+    name              = "primary"
+  }
+  base_instance_name = "foobar"
+  zone               = "us-central1-f"
+  target_size        = 1
+
+	named_port {
+    name = "custom"
+    port = 8888
+  }
+}
+
+resource "google_compute_instance_template" "foobar" {
+  name         = "%s"
+  machine_type = "n1-standard-1"
+
+  network_interface {
+    network = "default"
+  }
+
+  disk {
+    source_image = data.google_compute_image.my_image.self_link
+    auto_delete  = true
+    boot         = true
+  }
+}
+
+resource "google_compute_health_check" "default" {
+  name               = "%s"
+  check_interval_sec = 1
+  timeout_sec        = 1
+
+  tcp_health_check {
+    port = 443
+  }
+}
+`, serviceName, timeout, igName, itName, checkName)
 }
